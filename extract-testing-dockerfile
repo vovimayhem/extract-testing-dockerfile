@@ -1,0 +1,42 @@
+#! /bin/sh
+
+# The Docker App Container's development entrypoint.
+# This is a script used by the project's Docker development environment to
+# setup the app containers and databases upon runnning.
+set -e
+
+: ${DOCKERFILE_PATH:="./Dockerfile"}
+: ${TESTING_DOCKERFILE_PATH:="./.testing.Dockerfile"}
+
+rm -rf ${TESTING_DOCKERFILE_PATH}
+
+CURSOR_ON_TESTING_STAGE="no"
+CURSOR_PAST_TESTING_STAGE="no"
+
+# 1: Write the first lines:
+cat << EOF > "${TESTING_DOCKERFILE_PATH}"
+# This file is auto-generated from the project's Dockerfile, to be used by
+# Codeship CI/CD pipeline as a workaround to the fact that Codeship Pro doesn't
+# fully support multi-stage Dockerfiles with a "target" option.
+#
+# Instead of editing this file, please edit your project's Dockerfile. The
+# project's after-commit hook will take care of the rest.
+
+EOF
+
+while IFS= read -r line
+do
+  if [ "${CURSOR_ON_TESTING_STAGE}" == "yes" ] && [[ "${line}" =~ ^FROM.+$ ]]
+  then CURSOR_PAST_TESTING_STAGE="yes";
+  fi
+
+  if [ ! "${CURSOR_ON_TESTING_STAGE}" == "yes" ] && [[ "${line}" =~ ^FROM.+AS.+testing$ ]]
+  then CURSOR_ON_TESTING_STAGE="yes";
+  fi
+
+  if [ "${CURSOR_PAST_TESTING_STAGE}" == "yes" ]; then break; fi
+
+  if [[ ! ${line} =~ ^((#.+)|\s*)$ ]]
+  then echo "${line}" >> "${TESTING_DOCKERFILE_PATH}";
+  fi
+done < "${DOCKERFILE_PATH}"
